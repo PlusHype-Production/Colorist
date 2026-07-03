@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colorist</title>
+    <style>
+        :root {
+            /* Core Theme */
+            --bg-root: #050505;
+            --bg-panel: #0f0f11;
+            --bg-elevated: #1a1a1d;
+            --text-primary: #ffffff;
+            --text-secondary: #888891;
+            --border-color: #27272a;
+            
+            /* Dynamic Accent - Updated by JS */
+            --accent: #8b5cf6;
+            --accent-glow: rgba(139, 92, 246, 0.2);
+            
+            /* Geometry */
+            --radius-lg: 20px;
+            --radius-md: 12px;
+            --radius-sm: 8px;
+            
+            /* Typography */
+            --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            background-color: var(--bg-root);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        /* --- Ambient Noise & Glow --- */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .ambient-glow {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60vw;
+            height: 60vw;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+            transition: background 0.5s ease;
+        }
+
+        /* --- Main App Container --- */
+        .app-container {
+            position: relative;
+            z-index: 10;
+            background: var(--bg-panel);
+            width: 100%;
+            max-width: 1000px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border-color);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.02) inset;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            overflow: hidden;
+        }
+
+        @media (max-width: 850px) {
+            .app-container { grid-template-columns: 1fr; }
+        }
+
+        /* --- Left Sidebar (Controls) --- */
+        .sidebar {
+            padding: 2rem;
+            border-right: 1px solid var(--border-color);
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .brand {
+            font-size: 1.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .brand svg {
+            width: 24px; height: 24px;
+            fill: var(--accent);
+            transition: fill 0.3s ease;
+        }
+
+        /* Inputs */
+        .input-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .floating-input {
+            position: relative;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .floating-input:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .floating-input label {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            pointer-events: none;
+            letter-spacing: 1px;
+        }
+
+        .floating-input input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            padding: 1rem 1rem 1rem 3.5rem;
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        /* Value Sliders */
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .slider-label {
+            width: 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .pro-slider {
+            flex-grow: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            outline: none;
+            position: relative;
+        }
+
+        /* Dynamic slider tracks using custom properties set in JS */
+        #rSlider { background: linear-gradient(90deg, #ff3b30 var(--val), var(--bg-elevated) var(--val)); }
+        #gSlider { background: linear-gradient(90deg, #34c759 var(--val), var(--bg-elevated) var(--val)); }
+        #bSlider { background: linear-gradient(90deg, #007aff var(--val), var(--bg-elevated) var(--val)); }
+
+        .pro-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            border: 2px solid var(--bg-panel);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+
+        .pro-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .slider-val {
+            width: 30px;
+            text-align: right;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        /* Action Button */
+        .btn-primary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: auto;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .btn-primary svg {
+            width: 18px; height: 18px;
+            fill: currentColor;
+        }
+
+        /* --- Right Main Area (Visuals) --- */
+        .main-stage {
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            background: #0a0a0c;
+        }
+
+        /* Color Map */
+        .map-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16/10;
+            border-radius: var(--radius-md);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 1px solid var(--border-color);
+            cursor: crosshair;
+            overflow: hidden;
+        }
+
+        #colorCanvas {
+            width: 100%; height: 100%;
+            display: block;
+        }
+
+        #target-reticle {
+            position: absolute;
+            width: 18px; height: 18px;
+            border: 2px solid white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 0 1px rgba(0,0,0,0.4), inset 0 0 0 1px rgba(0,0,0,0.4);
+            pointer-events: none;
+            transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .map-wrapper:active #target-reticle {
+            transform: translate(-50%, -50%) scale(0.7);
+        }
+
+        /* Master Hue Slider */
+        .master-hue {
+            -webkit-appearance: none;
+            width: 100%; height: 16px;
+            border-radius: 8px;
+            background: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+            outline: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.1);
+        }
+
+        .master-hue::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px; height: 24px;
+            background: transparent;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: grab;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+        }
+        .master-hue::-webkit-slider-thumb:active { cursor: grabbing; }
+
+        /* Output & Harmonies */
+        .footer-metrics {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 1.5rem;
+            align-items: stretch;
+            margin-top: auto;
+        }
+
+        .main-swatch {
+            width: 100%;
+            aspect-ratio: 1/1;
+            border-radius: var(--radius-md);
+            background: var(--accent);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1), 0 4px 15px var(--accent-glow);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        .harmonies {
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .harmonies-title {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .swatch-row {
+            display: flex;
+            gap: 10px;
+            height: 36px;
+        }
+
+        .mini-swatch {
+            flex: 1;
+            border-radius: var(--radius-sm);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .mini-swatch:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 2rem;
+            background: var(--text-primary);
+            color: var(--bg-root);
+            padding: 1rem 2rem;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-glow"></div>
+
+    <div class="app-container">
+        
+        <aside class="sidebar">
+            <div class="brand">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.1 14.5l-4.2-4.2 1.4-1.4 2.8 2.8 7.1-7.1 1.4 1.4-8.5 8.5z"/></svg>
+                Colorist
+            </div>
+
+            <div class="input-stack">
+                <div class="floating-input">
+                    <label>HEX</label>
+                    <input type="text" id="hexIn" value="#8B5CF6" maxlength="7">
+                </div>
+                <div class="floating-input">
+                    <label>RGB</label>
+                    <input type="text" id="rgbIn" value="139, 92, 246">
+                </div>
+                <div class="floating-input">
+                    <label>HSL</label>
+                    <input type="text" id="hslIn" value="258°, 89%, 66%">
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-row">
+                    <span class="slider-label">R</span>
+                    <input type="range" class="pro-slider" id="rSlider" min="0" max="255" value="139">
+                    <span class="slider-val" id="rVal">139</span>
+                </div>
+                <div class="slider-row">
+                    <span class="slider-label">G</span>
+                    <input type="range" class="pro-slider" id="gSlider" min="0" max="255" value="92">
+                    <span class="slider-val" id="gVal">92</span>
+                </div>
+                <div class="slider-row">
+                    <span class="slider-label">B</span>
+                    <input type="range" class="pro-slider" id="bSlider" min="0" max="255" value="246">
+                    <span class="slider-val" id="bVal">246</span>
+                </div>
+            </div>
+
+            <button class="btn-primary" id="copyBtn">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                Copy Format
+            </button>
+        </aside>
+
+        <main class="main-stage">
+            <div class="map-wrapper" id="colorMap">
+                <canvas id="colorCanvas"></canvas>
+                <div id="target-reticle"></div>
+            </div>
+            
+            <input type="range" class="master-hue" id="masterHue" min="0" max="360" value="258">
+
+            <div class="footer-metrics">
+                <div class="main-swatch" id="mainSwatch"></div>
+                
+                <div class="harmonies">
+                    <span class="harmonies-title">Analogous Harmony</span>
+                    <div class="swatch-row" id="harmonyRow">
+                        </div>
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <div class="toast" id="toast">
+        <svg style="width:16px;height:16px;fill:var(--bg-root)" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        Copied to clipboard
+    </div>
+
+    <script>
+        /* --- DOM Cache --- */
+        const UI = {
+            canvas: document.getElementById('colorCanvas'),
+            ctx: document.getElementById('colorCanvas').getContext('2d', { willReadFrequently: true }),
+            map: document.getElementById('colorMap'),
+            reticle: document.getElementById('target-reticle'),
+            hue: document.getElementById('masterHue'),
+            
+            hex: document.getElementById('hexIn'),
+            rgb: document.getElementById('rgbIn'),
+            hsl: document.getElementById('hslIn'),
+            
+            rS: document.getElementById('rSlider'),
+            gS: document.getElementById('gSlider'),
+            bS: document.getElementById('bSlider'),
+            
+            rV: document.getElementById('rVal'),
+            gV: document.getElementById('gVal'),
+            bV: document.getElementById('bVal'),
+            
+            swatch: document.getElementById('mainSwatch'),
+            harmonyBox: document.getElementById('harmonyRow')
+        };
+
+        /* --- State --- */
+        let State = { h: 258, s: 62.6, v: 96.5, r: 139, g: 92, b: 246 };
+        let isDragging = false;
+
+        /* --- Math Utilities --- */
+        const MathX = {
+            hsvToRgb: (h, s, v) => {
+                h /= 360; s /= 100; v /= 100;
+                let r, g, b, i = Math.floor(h * 6), f = h * 6 - i;
+                let p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+                switch (i % 6) {
+                    case 0: r = v; g = t; b = p; break;
+                    case 1: r = q; g = v; b = p; break;
+                    case 2: r = p; g = v; b = t; break;
+                    case 3: r = p; g = q; b = v; break;
+                    case 4: r = t; g = p; b = v; break;
+                    case 5: r = v; g = p; b = q; break;
+                }
+                return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+            },
+            rgbToHsv: (r, g, b) => {
+                r /= 255; g /= 255; b /= 255;
+                let max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+                let h, s = max === 0 ? 0 : d / max, v = max;
+                if (max === min) h = 0;
+                else {
+                    switch (max) {
+                        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                        case g: h = (b - r) / d + 2; break;
+                        case b: h = (r - g) / d + 4; break;
+                    }
+                    h /= 6;
+                }
+                return { h: Math.round(h * 360), s: s * 100, v: v * 100 };
+            },
+            rgbToHsl: (r, g, b) => {
+                r /= 255; g /= 255; b /= 255;
+                let max = Math.max(r, g, b), min = Math.min(r, g, b);
+                let h, s, l = (max + min) / 2;
+                if (max === min) h = s = 0;
+                else {
+                    let d = max - min;
+                    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+                    switch (max) {
+                        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+                        case g: h = (b - r) / d + 2; break;
+                        case b: h = (r - g) / d + 4; break;
+                    }
+                    h /= 6;
+                }
+                return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+            },
+            toHex: (r, g, b) => "#" + (1 << 24 | r << 16 | g << 8 | b).toString(16).slice(1).toUpperCase(),
+            fromHex: (hex) => {
+                let res = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return res ? { r: parseInt(res[1], 16), g: parseInt(res[2], 16), b: parseInt(res[3], 16) } : null;
+            }
+        };
+
+        /* --- Engine --- */
+        function initCanvas() {
+            UI.canvas.width = UI.map.clientWidth;
+            UI.canvas.height = UI.map.clientHeight;
+            drawMap();
+            positionReticle();
+        }
+
+        function drawMap() {
+            const base = MathX.hsvToRgb(State.h, 100, 100);
+            
+            // Base Color
+            UI.ctx.fillStyle = `rgb(${base.r}, ${base.g}, ${base.b})`;
+            UI.ctx.fillRect(0, 0, UI.canvas.width, UI.canvas.height);
+
+            // White gradient (Left to Right)
+            let wG = UI.ctx.createLinearGradient(0, 0, UI.canvas.width, 0);
+            wG.addColorStop(0, '#FFF'); wG.addColorStop(1, 'rgba(255,255,255,0)');
+            UI.ctx.fillStyle = wG;
+            UI.ctx.fillRect(0, 0, UI.canvas.width, UI.canvas.height);
+
+            // Black gradient (Top to Bottom)
+            let bG = UI.ctx.createLinearGradient(0, 0, 0, UI.canvas.height);
+            bG.addColorStop(0, 'rgba(0,0,0,0)'); bG.addColorStop(1, '#000');
+            UI.ctx.fillStyle = bG;
+            UI.ctx.fillRect(0, 0, UI.canvas.width, UI.canvas.height);
+        }
+
+        function positionReticle() {
+            const x = (State.s / 100) * UI.canvas.width;
+            const y = (1 - (State.v / 100)) * UI.canvas.height;
+            UI.reticle.style.left = `${x}px`;
+            UI.reticle.style.top = `${y}px`;
+        }
+
+        function updateSystem(source) {
+            const hex = MathX.toHex(State.r, State.g, State.b);
+            const hsl = MathX.rgbToHsl(State.r, State.g, State.b);
+            
+            // Sync Theme CSS Variables (The "Pro" Dynamic Glow feature)
+            document.documentElement.style.setProperty('--accent', hex);
+            document.documentElement.style.setProperty('--accent-glow', `rgba(${State.r}, ${State.g}, ${State.b}, 0.25)`);
+
+            // Output Values
+            if (source !== 'hex') UI.hex.value = hex;
+            UI.rgb.value = `${State.r}, ${State.g}, ${State.b}`;
+            UI.hsl.value = `${hsl.h}°, ${hsl.s}%, ${hsl.l}%`;
+
+            // Sliders Fill logic
+            if (source !== 'rgb') {
+                UI.rS.value = State.r; UI.rV.textContent = State.r;
+                UI.rS.style.setProperty('--val', `${(State.r/255)*100}%`);
+                
+                UI.gS.value = State.g; UI.gV.textContent = State.g;
+                UI.gS.style.setProperty('--val', `${(State.g/255)*100}%`);
+                
+                UI.bS.value = State.b; UI.bV.textContent = State.b;
+                UI.bS.style.setProperty('--val', `${(State.b/255)*100}%`);
+            }
+            if (source !== 'hue') UI.hue.value = State.h;
+
+            generateHarmonies();
+        }
+
+        function generateHarmonies() {
+            // Generate Analogous Colors (+30 deg, +15, -15, -30)
+            const offsets = [-30, -15, 15, 30];
+            let html = '';
+            offsets.forEach(off => {
+                let newH = (State.h + off + 360) % 360;
+                let rgb = MathX.hsvToRgb(newH, State.s, State.v);
+                let hx = MathX.toHex(rgb.r, rgb.g, rgb.b);
+                html += `<div class="mini-swatch" style="background:${hx}" onclick="setHex('${hx}')"></div>`;
+            });
+            UI.harmonyBox.innerHTML = html;
+        }
+
+        window.setHex = function(hexStr) {
+            UI.hex.value = hexStr;
+            UI.hex.dispatchEvent(new Event('input'));
+        }
+
+        /* --- Interactions --- */
+        function drag(e) {
+            if (!isDragging && e.type !== 'mousedown') return;
+            const rect = UI.canvas.getBoundingClientRect();
+            let x = Math.max(0, Math.min(e.clientX - rect.left, UI.canvas.width));
+            let y = Math.max(0, Math.min(e.clientY - rect.top, UI.canvas.height));
+
+            State.s = (x / UI.canvas.width) * 100;
+            State.v = 100 - ((y / UI.canvas.height) * 100);
+
+            const rgb = MathX.hsvToRgb(State.h, State.s, State.v);
+            State.r = rgb.r; State.g = rgb.g; State.b = rgb.b;
+
+            positionReticle();
+            updateSystem('canvas');
+        }
+
+        UI.map.addEventListener('mousedown', (e) => { isDragging = true; drag(e); });
+        window.addEventListener('mousemove', drag);
+        window.addEventListener('mouseup', () => isDragging = false);
+
+        // Mobile Touch Support
+        UI.map.addEventListener('touchstart', (e) => { isDragging = true; drag(e.touches[0]); }, {passive: false});
+        window.addEventListener('touchmove', (e) => { if(isDragging) { e.preventDefault(); drag(e.touches[0]); }}, {passive: false});
+        window.addEventListener('touchend', () => isDragging = false);
+
+        // Hue Slider
+        UI.hue.addEventListener('input', (e) => {
+            State.h = parseInt(e.target.value);
+            drawMap();
+            const rgb = MathX.hsvToRgb(State.h, State.s, State.v);
+            State.r = rgb.r; State.g = rgb.g; State.b = rgb.b;
+            updateSystem('hue');
+        });
+
+        // RGB Sliders
+        ['r', 'g', 'b'].forEach(c => {
+            const slider = UI[`${c}S`];
+            slider.addEventListener('input', () => {
+                State.r = parseInt(UI.rS.value); State.g = parseInt(UI.gS.value); State.b = parseInt(UI.bS.value);
+                UI.rV.textContent = State.r; UI.gV.textContent = State.g; UI.bV.textContent = State.b;
+                
+                UI.rS.style.setProperty('--val', `${(State.r/255)*100}%`);
+                UI.gS.style.setProperty('--val', `${(State.g/255)*100}%`);
+                UI.bS.style.setProperty('--val', `${(State.b/255)*100}%`);
+
+                const hsv = MathX.rgbToHsv(State.r, State.g, State.b);
+                State.h = hsv.h; State.s = hsv.s; State.v = hsv.v;
+
+                drawMap();
+                positionReticle();
+                updateSystem('rgb');
+            });
+        });
+
+        // Hex Input typing
+        UI.hex.addEventListener('input', (e) => {
+            let val = e.target.value.trim();
+            if(!val.startsWith('#')) val = '#' + val;
+            if(val.length === 7) {
+                const rgb = MathX.fromHex(val);
+                if(rgb) {
+                    State.r = rgb.r; State.g = rgb.g; State.b = rgb.b;
+                    const hsv = MathX.rgbToHsv(State.r, State.g, State.b);
+                    State.h = hsv.h; State.s = hsv.s; State.v = hsv.v;
+                    drawMap();
+                    positionReticle();
+                    updateSystem('hex');
+                }
+            }
+        });
+
+        // Copy
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(UI.hex.value).then(() => {
+                const toast = document.getElementById('toast');
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 2000);
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            initCanvas();
+        });
+
+        /* --- Boot --- */
+        window.onload = () => {
+            initCanvas();
+            updateSystem('init');
+        };
+    </script>
+</body>
+</html>
